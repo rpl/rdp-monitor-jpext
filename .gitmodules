@@ -1,0 +1,6 @@
+[submodule "addon-sdk"]
+	path = addon-sdk
+	url = http://github.com/mozilla/addon-sdk
+[submodule "packages/gcli"]
+	path = packages/gcli
+	url = https://github.com/erikvold/gcli-jplib

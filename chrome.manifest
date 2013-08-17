@@ -1,0 +1,4 @@
+content rdp-monitor chrome/content/
+skin rdp-monitor classic/1.0 chrome/skin/
+
+locale rdp-monitor en-US chrome/locale/en-US/
