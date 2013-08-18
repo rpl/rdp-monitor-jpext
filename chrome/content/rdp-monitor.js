@@ -8,10 +8,9 @@ Cu.import("resource:///modules/devtools/VariablesView.jsm");
 let RDPMonitorView = {
   initialize: function (DebuggerServer, toolbox) {
     try {
-      dump("DEBUG\n");
       this._toolbox = toolbox;
       this._DebuggerServer = DebuggerServer;
-      this._loggingConnections = {};
+      this._loggedConnection = null;
       this._initializePanes();
     } catch(e) {
       dump("EXCEPTION initializing RDPMonitorView: " + e + "\n");
@@ -22,24 +21,19 @@ let RDPMonitorView = {
     this._destroyPanes();
   },
 
-  get selectedConnectionName() {
-    let el = this.Sidebar.getFocusedItem();
-    if (el) {
-      return el._name.value;
-    } else {
-      return null;
-    }
-  },
-
   get selectedConnection() {
-    return this._DebuggerServer._connections[this.selectedConnectionName];
+    if (this._DebuggerServer) {
+      return this._DebuggerServer._connections[this.Sidebar.selectedConnectionName];
+    }
+    return null;
   },
 
   enableLogging: function() {
-    if (this.selectedConnectionName &&
-        Object.keys(this._loggingConnections).indexOf(this.selectedConnectionName) < 0) {
+    this.disableLogging();
+
+    if (this.selectedConnection) {
       let conn = this.selectedConnection;
-      this._loggingConnections[this.selectedConnectionName] = conn;
+      this._loggedConnection = conn;
 
       conn.__transportSend = conn.transport.send.bind(conn.transport);
       conn.__onPacket = conn.onPacket.bind(conn);
@@ -48,34 +42,28 @@ let RDPMonitorView = {
       conn.transport.send = (pkt) => this.onSend(conn, pkt);
       conn.onPacket = (pkt) => this.onPacket(conn, pkt);
       conn.onClosed = () => this.onClosed(conn);
-
-      RDPMonitorView.Sidebar.loggingConnections = Object.keys(this._loggingConnections);
     }
   },
   onSend: function(conn, pkt) {
-    dump("ON SEND\n");
     this.PacketList.addPacket(Date.now(), conn._prefix, "send", JSON.stringify(pkt));
     return conn.__transportSend(pkt);
   },
   onPacket: function(conn, pkt) {
-    dump("ON PACKET\n");
     this.PacketList.addPacket(Date.now(), conn._prefix, "recv", JSON.stringify(pkt));
     return conn.__onPacket(pkt);
   },
   onClosed: function(conn) {
-    dump("ON CLOSED\n");
     return conn.__onClosed();
   },
 
   disableLogging: function() {
-    let connName = this.selectedConnectionName;
-    let conn = this.selectedConnection;
-    conn.transport.send = conn.__transportSend;
-    conn.onPacket = conn.__onPacket;
-    conn.onClosed = conn.__onClosed;
-    delete this._loggingConnections[connName];
-
-    RDPMonitorView.Sidebar.loggingConnections = Object.keys(this._loggingConnections);
+    if (this._loggedConnection) {
+      let conn = this._loggedConnection;
+      conn.transport.send = conn.__transportSend;
+      conn.onPacket = conn.__onPacket;
+      conn.onClosed = conn.__onClosed;
+      delete this._loggedConnection;
+    }
   },
 
   _initializePanes: function () {
@@ -96,10 +84,37 @@ PacketListView.prototype = {
     this._loggedPackets = [];
     this._listView = document.querySelector("#pkt-list");
     this._listView.addEventListener("select", (e) => this.onSelection(e));
+
+    this._clearBtn = document.querySelector("#pkt-list-clear-btn");
+    this._clearBtn.addEventListener("command", (e) => this.onClear(e));
+
+    this._exportBtn = document.querySelector("#pkt-list-export-btn");
+    this._exportBtn.addEventListener("command", (e) => this.onExport(e));
+
+    this._diagramBtn = document.querySelector("#pkt-list-diagram-btn");
+    this._diagramBtn.addEventListener("command", (e) => this.onDiagram(e));
+  },
+
+  onClear: function(evt) {
+    this._emptyListView();
+    this._loggedPackets = [];
+  },
+
+  _emptyListView: function() {
+    while (this._listView.firstChild) {
+      this._listView.removeChild(this._listView.firstChild);
+    }
+  },
+
+  onExport: function(evt) {
+
+  },
+
+  onDiagram: function(evt) {
+
   },
 
   onSelection: function(evt) {
-    dump("DEBUG: " + this._listView.selectedIndex+"\n");
     RDPMonitorView.Sidebar.selectedPacket = this._loggedPackets[this._listView.selectedIndex];
   },
 
@@ -125,8 +140,10 @@ PacketListView.prototype = {
     node.appendChild(child);
 
     child = document.createElement("description");
-    child.setAttribute("value", message.slice(0,200));
+    child.setAttribute("value", message);
     child.setAttribute("class", "message");
+    child.setAttribute("flex", "1");
+    child.setAttribute("crop", "right");
 
     node.appendChild(child);
 
@@ -140,7 +157,7 @@ PacketListView.prototype = {
 
     return node;
   }
-}
+};
 
 function ToolbarView() {
 }
@@ -159,28 +176,68 @@ function SidebarView() {
 
 SidebarView.prototype = {
   initialize: function(DebuggerServer) {
+    this._connSelectorView = document.querySelector("#logged-conn-selector");
+    this._connSelectorView.addEventListener("select",
+                                            () => this.onSelectConn(),
+                                            true);
     this._DebuggerServer = DebuggerServer;
     this._debuggerServerVariablesView = new VariablesView(document.querySelector("#dbg-server-view"));
     this._debuggerServerVariablesView.contextMenuId = "variableViewContextMenu";
     this._selectedPacket = null;
     this.refresh();
   },
+  onSelectConn: function() {
+    let selected = this._connSelectorView.selectedItem;
+    if (!selected || selected.getAttribute("label") == "") {
+      // disable logging
+      RDPMonitorView.disableLogging();
+      this._loggedConnection = null;
+    } else {
+      // enable logging
+      RDPMonitorView.enableLogging();
+      this._loggedConnection = this._DebuggerServer._connections[this.selectedConnectionName];
+    }
+    this._renderVariablesView();
+  },
   refresh: function() {
+    this._renderConnSelectorView();
+    this._renderVariablesView();
+  },
+  _renderVariablesView: function() {
     this._debuggerServerVariablesView.rawObject = {
       DebuggerServer: this._DebuggerServer,
-      Connections: this._DebuggerServer._connections,
-      SelectedPacket: this._selectedPacket,
-      LoggingConnections: this._loggingConnections
+      SELECTED_PACKET: this._selectedPacket,
+      LOGGED_CONNECTION: this._loggedConnection
     };
   },
+  _renderConnSelectorView: function() {
+    let menulist = this._connSelectorView;
+
+    let menupopup = menulist.querySelector("menupopup");
+    while(menupopup.hasChildNodes()){
+      menupopup.removeChild(menupopup.firstChild);
+    }
+
+    let options = [""].concat(Object.keys(this._DebuggerServer._connections));
+
+    options.forEach(function(value) {
+      let menuitem = document.createElement("menuitem");
+      menuitem.setAttribute("label", value);
+      if ((this._loggedConnection && value == this._loggedConnection._prefix) ||
+          (!this._loggedConnection && value == "")) {
+        menuitem.setAttribute("selected", true);
+        menulist.setAttribute("label", value);
+      }
+      menupopup.appendChild(menuitem);
+    });
+  },
+
+  get selectedConnectionName() {
+    return this._connSelectorView.getAttribute("label");
+  },
+
   destroy: function() {
 
-  },
-  getFocusedItem: function() {
-    if (this._debuggerServerVariablesView) {
-      return this._debuggerServerVariablesView.getFocusedItem();
-    }
-    return null;
   },
   set selectedPacket(value) {
     this._selectedPacket = value;
@@ -190,13 +247,8 @@ SidebarView.prototype = {
   get selectedPacket() {
     return this._selectedPacket;
   },
-  set loggingConnections(value) {
-    this._loggingConnections = value;
-    this.refresh();
-    return value;
-  },
-  get loggingConnections() {
-    return this._loggingConnections;
+  get loggedConnection() {
+    return this._loggedConnection;
   }
 };
 

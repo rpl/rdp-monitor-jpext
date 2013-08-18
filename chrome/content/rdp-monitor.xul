@@ -39,9 +39,36 @@
   </menupopup>
 
   <hbox flex="1">
-    <vbox hidden="false" width="400" id="dbg-server-view"/>
+    <vbox width="400">
+      <hbox height="48" align="center" class="devtools-toolbar">
+        <label>Select connection:</label>
+        <menulist flex="1" label="" id="logged-conn-selector">
+          <menupopup>
+            <menuitem label="" />
+          </menupopup>
+        </menulist>
+      </hbox>
+      <vbox flex="1" id="dbg-server-view"/>
+    </vbox>
+
     <splitter class="devtools-side-splitter"/>
     <vbox flex="1">
+      <toolbar height="48" class="devtools-toolbar" mode="full">
+        <toolbarbutton class="devtools-toolbarbutton"
+                       label="Export"
+                       id="pkt-list-export-btn"
+                       tooltiptext=""/>
+        <toolbarbutton class="devtools-toolbarbutton"
+                       label="Diagram"
+                       id="pkt-list-diagram-btn"
+                       tooltiptext=""/>
+        <spacer flex="1"/>
+        <toolbarbutton class="devtools-toolbarbutton"
+                       label="Clear"
+                       id="pkt-list-clear-btn"
+                       tooltiptext=""/>
+
+      </toolbar>
       <richlistbox flex="1" id="pkt-list" rows="100">
       </richlistbox>
     </vbox>
