@@ -1,13 +1,14 @@
 {
-    "preferences": [], 
-    "name": "rdp-monitor", 
-    "license": "MPL 2.0", 
-    "author": "Luca Greco <luca.greco@alcacoop.it>", 
-    "version": "0.1", 
+    "preferences": [],
+    "name": "rdp-monitor",
+    "license": "MPL 2.0",
+    "author": "Luca Greco <luca.greco@alcacoop.it>",
+    "version": "0.1.1",
     "dependencies": [
         "gcli"
-    ], 
-    "fullName": "RDP Monitor", 
-    "id": "jid1-yR4E1uOYxe8HMg", 
+    ],
+    "fullName": "RDP Monitor",
+    "!id": "jid1-yR4E1uOYxe8HMg",
+    "id": "rdp-monitor@alcacoop.it",
     "description": "RDP Monitor - developer tools tab"
 }

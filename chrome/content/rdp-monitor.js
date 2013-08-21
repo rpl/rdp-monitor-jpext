@@ -5,6 +5,11 @@ Cu.import("resource://gre/modules/Services.jsm");
 Cu.import("resource://gre/modules/XPCOMUtils.jsm");
 Cu.import("resource:///modules/devtools/VariablesView.jsm");
 
+// NOTE: very crude hack, needed so other addons (e.g. FirefoxOS Simulator)
+// can request logging of their debugger clients
+// TODO: port to ConnectionManager (http://bugzilla.mozilla.org/898485)
+Cu.import("resource://rdp-monitor-at-alcacoop-dot-it/rdp-monitor/data/modules/RDPMonitor.jsm");
+
 let RDPMonitorView = {
   initialize: function (DebuggerServer, toolbox) {
     try {
@@ -12,12 +17,14 @@ let RDPMonitorView = {
       this._DebuggerServer = DebuggerServer;
       this._loggedConnection = null;
       this._initializePanes();
+      setLoggingCallback(this.handleLogMessage.bind(this));
     } catch(e) {
       dump("EXCEPTION initializing RDPMonitorView: " + e + "\n");
     }
   },
 
   destroy: function () {
+    setLoggingCallback(null);
     this._destroyPanes();
   },
 
@@ -35,33 +42,17 @@ let RDPMonitorView = {
       let conn = this.selectedConnection;
       this._loggedConnection = conn;
 
-      conn.__transportSend = conn.transport.send.bind(conn.transport);
-      conn.__onPacket = conn.onPacket.bind(conn);
-      conn.__onClosed = conn.onClosed.bind(conn);
-
-      conn.transport.send = (pkt) => this.onSend(conn, pkt);
-      conn.onPacket = (pkt) => this.onPacket(conn, pkt);
-      conn.onClosed = () => this.onClosed(conn);
+      startLogDebuggerConnection(conn);
     }
   },
-  onSend: function(conn, pkt) {
-    this.PacketList.addPacket(Date.now(), conn._prefix, "send", JSON.stringify(pkt));
-    return conn.__transportSend(pkt);
-  },
-  onPacket: function(conn, pkt) {
-    this.PacketList.addPacket(Date.now(), conn._prefix, "recv", JSON.stringify(pkt));
-    return conn.__onPacket(pkt);
-  },
-  onClosed: function(conn) {
-    return conn.__onClosed();
+  handleLogMessage: function(msg) {
+    this.PacketList.addPacket(msg.timestamp, msg.connection._prefix,
+                              msg.direction, JSON.stringify(msg.packet));
   },
 
   disableLogging: function() {
     if (this._loggedConnection) {
-      let conn = this._loggedConnection;
-      conn.transport.send = conn.__transportSend;
-      conn.onPacket = conn.__onPacket;
-      conn.onClosed = conn.__onClosed;
+      stopLogDebuggerConnection();
       delete this._loggedConnection;
     }
   },
@@ -98,6 +89,7 @@ PacketListView.prototype = {
   onClear: function(evt) {
     this._emptyListView();
     this._loggedPackets = [];
+    clearLoggedDebuggerMessages();
   },
 
   _emptyListView: function() {
