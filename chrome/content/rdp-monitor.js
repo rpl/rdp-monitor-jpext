@@ -11,15 +11,22 @@ Cu.import("resource:///modules/devtools/VariablesView.jsm");
 Cu.import("resource://rdp-monitor-at-alcacoop-dot-it/rdp-monitor/data/modules/RDPMonitor.jsm");
 
 let RDPMonitorView = {
-  initialize: function (DebuggerServer, toolbox) {
+  initialize: function (DebuggerServer, toolbox, openDiagramCb) {
     try {
       this._toolbox = toolbox;
       this._DebuggerServer = DebuggerServer;
       this._loggedConnection = null;
       this._initializePanes();
+      this._openDiagramCb = openDiagramCb;
       setLoggingCallback(this.handleLogMessage.bind(this));
     } catch(e) {
       dump("EXCEPTION initializing RDPMonitorView: " + e + "\n");
+    }
+  },
+
+  onDiagram: function (pkt_list) {
+    if (this._openDiagramCb) {
+      this._openDiagramCb(pkt_list);
     }
   },
 
@@ -46,6 +53,12 @@ let RDPMonitorView = {
     }
   },
   handleLogMessage: function(msg) {
+    if (!this._loggedConnection) {
+      // WORKAROUND: set debugger client into the sidebar when an external addon
+      // request logging using the shared jsm
+      this._loggedConnection = msg.connection;
+      this.Sidebar.loggedConnection = msg.connection;
+    }
     this.PacketList.addPacket(msg.timestamp, msg.connection._prefix,
                               msg.direction, JSON.stringify(msg.packet));
   },
@@ -103,7 +116,7 @@ PacketListView.prototype = {
   },
 
   onDiagram: function(evt) {
-
+    RDPMonitorView.onDiagram(this._loggedPackets);
   },
 
   onSelection: function(evt) {
@@ -241,6 +254,11 @@ SidebarView.prototype = {
   },
   get loggedConnection() {
     return this._loggedConnection;
+  },
+  set loggedConnection(value) {
+    this._loggedConnection = value;
+    this.refresh();
+    return value;
   }
 };
 

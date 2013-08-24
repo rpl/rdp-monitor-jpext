@@ -39,11 +39,11 @@ this.startLogDebuggerConnection = function(conn, direction, prefix) {
 };
 
 this.stopLogDebuggerConnection = function(conn) {
-  if (typeof conn == "undefined") {
+  if (!conn) {
     conn = loggedConnection;
   }
 
-  if (typeof conn != "undefined" && loggedConnection === conn) {
+  if (conn && loggedConnection === conn) {
     let transport = !conn.transport ? conn._transport : conn.transport;
 
     // NOTE: transport could be null if the connection is closed

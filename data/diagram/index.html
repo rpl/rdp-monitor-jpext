@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<style>
+</style>
+<body>
+</body>
+<script src="d3.v3.min.js"></script>
+<script>
+
+var test_list = [
+{
+  timestamp: Date.now(),
+  direction: "send",
+  message: {
+    prova: 123,
+    prova2: 123,
+    prova3: 123,
+    nested: {
+      ppp: 5
+    },
+    prova4: 123,
+    prova5: 123,
+  }
+},
+{
+  timestamp: Date.now(),
+  direction: "recv",
+  message: {
+    prova: 123,
+    p2: "porva"
+  }
+}
+];
+
+function render(pkt_list) {
+  var width = 960,
+      height = 500;
+
+  d3.select("svg").remove();
+
+  var svg = d3.select("body").append("svg")
+    .attr("class", "hidden")
+    .attr("width", width)
+    .attr("height", height)
+  .append("g")
+    .attr("transform", "translate(" + width / 2 + "," + 0 + ")scale(.55)")
+  .append("g");
+
+var frame = svg.append("g")
+    .datum({radius: Infinity});
+
+// PASS0: add the two actors
+
+var actors = svg.append("g").attr("class", "actors");
+
+actors.selectAll("rect").
+  data(["DebuggerClient", "DebuggerServer"]).enter().
+  append("rect").attr({ fill: "none", width: 100, height: 30, stroke: "#000000", "stroke-width": 1 });
+
+actors.selectAll("text").
+  data(["DebuggerClient", "DebuggerServer"]).enter().
+  append("text").
+  append("tspan").text(function (d) { return d });
+
+
+
+// PASS2: add line boxes
+var message_boxes = frame.selectAll(".message_boxes").
+  data(pkt_list).
+  enter().append("g").attr("class", "message_boxes");
+
+message_boxes.
+  append("rect").attr({ fill: "none", width: 100, height: 30, stroke: "#000000", "stroke-width": 1 });
+
+// PASS1: add text boxes
+/* <rect stroke-width="2" style="" stroke="#000000" fill="none" ry="0" rx="0" r="0" height="29" width="258" y="10" x="10"></rect>*/
+
+message_boxes.
+  append("text").
+  // TODO: text attributes
+  each(function (d, i) {
+    var lines = JSON.stringify(d.message, null, 2).split('\n');
+    if (lines.length > 20) {
+      var tot = lines.length;
+      lines = lines.slice(0, 20);
+      lines.push("... MORE " + (tot - 20) + " lines");
+    }
+    console.log("TEXT", d, i, this, lines);
+    d.lines = lines;
+    d3.select(this).selectAll("tspan").data(lines).
+      enter().append("tspan").text(function (d,i) { return d; });
+  });
+  // TODO: add tspan attributes
+
+
+// PASS3: layouting
+var actorsBBoxes = [];
+actors.selectAll("text").each(function() { actorsBBoxes.push(this.getBBox()); });
+var minWidth = d3.min(actorsBBoxes.map(function(bbox) { return bbox.width; }));
+var maxWidth = d3.max(actorsBBoxes.map(function(bbox) { return bbox.width; }));
+
+actors.
+  selectAll("text").
+  attr("x", function (d,i) {
+    if (i == 0) {
+      return -minWidth;
+    }   else {
+      return +minWidth;
+    }
+  }).
+  attr("y", 35);
+
+actors.
+  selectAll("rect").
+  attr("x", function (d,i) {
+    if (i == 0) {
+      return -minWidth-10;
+    }   else {
+      return +minWidth-10;
+    }
+  }).
+  attr("height", 50).
+  attr("width", function (d, i) { return actorsBBoxes[i].width + 20; }).
+  attr("y", 5);
+
+var baseLine = [];
+var centers = [];
+actors.selectAll("rect").each(function() {
+  baseLine.push(parseFloat(d3.select(this).attr("y")) + parseFloat(d3.select(this).attr("height")));
+  centers.push(parseFloat(d3.select(this).attr("x")) + parseFloat(d3.select(this).attr("width"))/2);
+});
+baseLine = d3.min(baseLine);
+
+var messagesBBoxes = [];
+frame.selectAll(".message_boxes text").each(function(d,i) {
+  messagesBBoxes.push(this.getBBox());
+});
+
+frame.selectAll(".message_boxes text").
+  each(function (d, i) {
+    var lineHeight = messagesBBoxes[i].height;
+    var dy = 0;
+    d3.select(this).selectAll("tspan").attr("x", 0).attr("dy", lineHeight).
+      attr("dx", function (d, i) { var m = d.match(/\s*/); return m ? m[0].length * 5 : 0 });
+    messagesBBoxes[i] = this.getBBox();
+  });
+
+var nextTop = baseLine;
+
+frame.selectAll(".message_boxes text").
+  attr("y", function (d, i) {
+    var currentTop = nextTop + 20;
+    nextTop = currentTop + messagesBBoxes[i].height + 20;
+    return currentTop;
+  }).
+  attr("x", function (d, i) {
+    console.log("MESSAGE", d, i, this);
+    switch(d.direction) {
+    case "send":
+      return centers[0] - messagesBBoxes[i].width - 20;
+      break;
+    case "recv":
+      return centers[1] + 20;
+      break;
+    }
+  }).each(function(d, i) {
+    messagesBBoxes[i] = this.getBBox();
+    var x = d3.select(this).attr("x");
+    d3.select(this).selectAll("tspan").attr("x", x);
+  });;
+
+var messages_text = frame.selectAll(".message_boxes text");
+var messages_rect = frame.selectAll(".message_boxes rect");
+
+messages_rect.
+  attr("x", function (d,i) {
+    var x = parseInt(d3.select(messages_text[0][i]).attr("x")) - 10;
+    return x;
+  }).
+  attr("y", function (d,i) {
+    var y = parseInt(d3.select(messages_text[0][i]).attr("y")) - 5;
+    return y;
+  }).
+  attr("width", function (d, i) {
+    return messages_text[0][i].getBBox().width + 20;
+  }).
+  attr("height", function (d, i) {
+    return messages_text[0][i].getBBox().height + 20;
+  });
+
+var graphBBox = {
+  x: 0,
+  y: 0,
+  width: 0,
+  scaledHeight: 0
+}
+
+svg.each(function () {
+  console.log(this, this.getBBox());
+  graphBBox.width = this.getBBox().width;
+  graphBBox.height = this.getBBox().height;
+  graphBBox.scaledHeight = this.getBBox().height*0.80;
+});
+
+d3.select("body").select("svg")
+    .attr("width", graphBBox.width)
+    .attr("height", graphBBox.scaledHeight)
+  .select("g")
+    .attr("transform", "translate(" + graphBBox.width / 2 + "," + 0 + ")scale(.79)");
+
+frame.append("path")
+  .attr({
+    "stroke-width": 2,
+    "stroke": "#000000",
+    "fill": "none",
+    "style": "",
+    "d": "M "+ centers[0] +" "+baseLine+" L "+centers[0]+" "+graphBBox.height
+  });
+
+frame.append("path")
+  .attr({
+    "stroke-width": 2,
+    "stroke": "#000000",
+    "fill": "none",
+    "style": "",
+    "d": "M "+centers[1]+" "+baseLine+" L "+centers[1]+" "+graphBBox.height
+  });
+
+d3.select("svg").append("defs").append("marker")
+  .attr({
+    refY: "2.5", refX: "2.5",
+    orient: "auto",
+    markerWidth: "5", markerHeight: "5",
+    id:"raphael-marker-endblock55"
+  }).append("use").attr({
+    stroke: "none", fill: "#000",
+    "stroke-width": "1.0000",
+    transform: "rotate(180 2.5 2.5) scale(1,1)",
+    "xlink:href": "#raphael-marker-block"
+  });
+
+d3.select("svg").select("defs").append("path").attr({
+  id: "raphael-marker-block", d: "M5,0 0,2.5 5,5z", "stroke-linecap": "round"
+});
+
+
+frame.selectAll(".message_links").data(pkt_list).enter()
+     .append("path").attr({
+       "stroke-dasharray": "0",
+       "marker-end": "url(#raphael-marker-endblock55)",
+       "stroke-width": "2",
+       stroke: "#000000",
+       fill: "none",
+       style: "",
+     }).attr("d", function (d,i) {
+       if (d.direction == "send") {
+         return "M "+ centers[0] + " " +
+                " "+ (messagesBBoxes[i].y + messagesBBoxes[i].height/2) +
+                " L "+ (centers[1] - 5) + " " +
+                " "+ (messagesBBoxes[i].y + messagesBBoxes[i].height/2)
+       } else {
+         return "M "+ centers[1] + " " +
+                " "+ (messagesBBoxes[i].y + messagesBBoxes[i].height/2) +
+                " L "+ (centers[0] + 5) + " " +
+                " "+ (messagesBBoxes[i].y + messagesBBoxes[i].height/2)
+       }
+     });
+}
+
+document.documentElement.addEventListener("addon-message",
+  function(event) {
+    render(event.detail);
+  }, false);
+</script>
+</html>
