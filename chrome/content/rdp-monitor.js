@@ -11,13 +11,14 @@ Cu.import("resource:///modules/devtools/VariablesView.jsm");
 Cu.import("resource://rdp-monitor-at-alcacoop-dot-it/rdp-monitor/data/modules/RDPMonitor.jsm");
 
 let RDPMonitorView = {
-  initialize: function (DebuggerServer, toolbox, openDiagramCb) {
+  initialize: function (options, toolbox) {
     try {
       this._toolbox = toolbox;
-      this._DebuggerServer = DebuggerServer;
+      this._DebuggerServer = options.DebuggerServer;
+      this._targetClient = options.targetClient;
       this._loggedConnection = null;
       this._initializePanes();
-      this._openDiagramCb = openDiagramCb;
+      this._openDiagramCb = options.onOpenDiagram;
       setLoggingCallback(this.handleLogMessage.bind(this));
     } catch(e) {
       dump("EXCEPTION initializing RDPMonitorView: " + e + "\n");
@@ -35,8 +36,15 @@ let RDPMonitorView = {
     this._destroyPanes();
   },
 
+  get connectionsList() {
+    return ["TargetClient"].concat(Object.keys(this._DebuggerServer._connections || {}));
+  },
+
   get selectedConnection() {
-    if (this._DebuggerServer) {
+    if (this.Sidebar.selectedConnectionName === "TargetClient") {
+      return this._targetClient;
+    }
+    if (this._DebuggerServer && this._DebuggerServer._connections) {
       return this._DebuggerServer._connections[this.Sidebar.selectedConnectionName];
     }
     return null;
@@ -200,7 +208,7 @@ SidebarView.prototype = {
     } else {
       // enable logging
       RDPMonitorView.enableLogging();
-      this._loggedConnection = this._DebuggerServer._connections[this.selectedConnectionName];
+      this._loggedConnection = RDPMonitorView.selectedConnection;
     }
     this._renderVariablesView();
   },
@@ -223,7 +231,7 @@ SidebarView.prototype = {
       menupopup.removeChild(menupopup.firstChild);
     }
 
-    let options = [""].concat(Object.keys(this._DebuggerServer._connections));
+    let options = [""].concat(RDPMonitorView.connectionsList);
 
     options.forEach(function(value) {
       let menuitem = document.createElement("menuitem");
