@@ -86,7 +86,6 @@ message_boxes.
       lines = lines.slice(0, 20);
       lines.push("... MORE " + (tot - 20) + " lines");
     }
-    console.log("TEXT", d, i, this, lines);
     d.lines = lines;
     d3.select(this).selectAll("tspan").data(lines).
       enter().append("tspan").text(function (d,i) { return d; });
@@ -155,7 +154,6 @@ frame.selectAll(".message_boxes text").
     return currentTop;
   }).
   attr("x", function (d, i) {
-    console.log("MESSAGE", d, i, this);
     switch(d.direction) {
     case "send":
       return centers[0] - messagesBBoxes[i].width - 20;
@@ -197,7 +195,6 @@ var graphBBox = {
 }
 
 svg.each(function () {
-  console.log(this, this.getBBox());
   graphBBox.width = this.getBBox().width;
   graphBBox.height = this.getBBox().height;
   graphBBox.scaledHeight = this.getBBox().height*0.80;
