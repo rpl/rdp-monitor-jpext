@@ -67,7 +67,7 @@ let RDPMonitorView = {
       this._loggedConnection = msg.connection;
       this.Sidebar.loggedConnection = msg.connection;
     }
-    this.PacketList.addPacket(msg.timestamp, msg.connection._prefix,
+    this.PacketList.addPacket(msg.timestamp, msg.connection._prefix || "TargetClient",
                               msg.direction, JSON.stringify(msg.packet));
   },
 
