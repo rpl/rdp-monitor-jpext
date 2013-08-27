@@ -236,8 +236,11 @@ SidebarView.prototype = {
     options.forEach(function(value) {
       let menuitem = document.createElement("menuitem");
       menuitem.setAttribute("label", value);
-      if ((this._loggedConnection && value == this._loggedConnection._prefix) ||
-          (!this._loggedConnection && value == "")) {
+      let loggedConnection = RDPMonitorView.selectedConnection;
+
+      if ((loggedConnection && value == loggedConnection._prefix) ||
+          (loggedConnection && !loggedConnection._prefix && value == "TargetClient") ||
+          (!loggedConnection && value == "")) {
         menuitem.setAttribute("selected", true);
         menulist.setAttribute("label", value);
       }
