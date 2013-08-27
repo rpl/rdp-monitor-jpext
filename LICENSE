@@ -1,0 +1,18 @@
+All of the source code to this product is available under licenses that are both
+free and open source.
+
+Most of it is available under the Mozilla Public License 2.0 (MPL), as specified
+by the license headers in each file.  Some of it (like the ADB executable that
+is packaged with builds) is available under the terms of a LICENSE file in its
+directory.  And some of it is available under other licenses as specified below.
+
+--------------------------------------------------------------------------------
+The following files:
+
+    d3.v3.min.js
+
+Are available under the following license:
+
+    Copyright (c) 2013, Michael Bostock
+    http://d3js.org/
+    BSD license.
